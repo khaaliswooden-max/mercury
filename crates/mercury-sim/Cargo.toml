@@ -1,0 +1,18 @@
+[package]
+name = "mercury-sim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "mercury-run"
+path = "src/main.rs"
+
+[lib]
+name = "mercury_sim"
+path = "src/lib.rs"
+
+[dependencies]
+mercury-ledger = { path = "../mercury-ledger" }
+mercury-asm    = { path = "../mercury-asm" }

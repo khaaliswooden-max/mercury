@@ -1,0 +1,8 @@
+/target
+/build
+Cargo.lock
+*.mem
+*.hex
+*.vvp
+*.jsonl
+.DS_Store

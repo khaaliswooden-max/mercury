@@ -1,0 +1,17 @@
+; countdown.msq — Mercury Phase 3 conformance program.
+;
+; Decrements N from 5 down to 0, looping back via an unconditional branch.
+; Exercises: subtraction with non-trivial values, branch-not-taken (loop body),
+; branch-taken (loop exit and unconditional jump), backward branches, and
+; reaching the halt sentinel.
+;
+; Trace: 11 completed instructions  (5 countdowns + 5 loop-back jumps + halt).
+;        Total cycles: 11 × 128 = 1408.
+
+.org 0
+loop:  ONE N halt          ; mem[N] -= 1; if mem[N] <= 0, jump to halt
+       Z   Z loop           ; mem[Z] -= mem[Z] = 0 → always branch back
+halt:  0   0 0xFFFF         ; branch to halt sentinel
+ONE:   .word 1
+N:     .word 5
+Z:     .word 0
