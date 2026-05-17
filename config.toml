@@ -1,0 +1,61 @@
+# Mercury — Physical Envelope Configuration
+# Source of truth for the Rust simulator and FPGA ledger.
+# Edits must be kept in sync with PHYSICS.md.
+
+[meta]
+project       = "mercury"
+phase         = 0
+spec_version  = "0.1.0"
+authored_by   = "Aldrich K. Wooden, Sr."
+
+# Select which envelope is active at runtime.
+# Valid values: "desktop", "lloyd_limit"
+[active]
+config = "desktop"
+
+# ---------------------------------------------------------------------------
+# Fundamental constants (CODATA / SI). Do not edit.
+# ---------------------------------------------------------------------------
+[constants]
+hbar_J_s          = 1.054571817e-34
+c_m_per_s         = 299792458.0
+G_m3_per_kg_s2    = 6.67430e-11
+kB_J_per_K        = 1.380649e-23
+ln2               = 0.6931471805599453
+
+# ---------------------------------------------------------------------------
+# Config A — Desktop (pragmatic). 1 kg / 10 cm / 300 K.
+# Used for FPGA benchmarking and software simulator default runs.
+# ---------------------------------------------------------------------------
+[envelopes.desktop]
+mass_kg              = 1.0
+radius_m             = 0.10
+temperature_K        = 300.0
+energy_J             = 8.987551787368177e16
+ops_per_s_ceiling    = 5.425570e50    # Margolus-Levitin
+bekenstein_bits      = 2.576908e42    # storage ceiling
+landauer_J_per_bit   = 2.870979e-21   # erasure floor
+light_crossing_s     = 3.335641e-10
+per_bit_flip_s       = 4.749562e-9
+
+# ---------------------------------------------------------------------------
+# Config B — Lloyd limit (symbolic). 1 kg compressed to R_s, T = T_Hawking.
+# Used for compliance ledger and Phase 5 report.
+# ---------------------------------------------------------------------------
+[envelopes.lloyd_limit]
+mass_kg              = 1.0
+radius_m             = 1.485232e-27   # R_s = 2Gm/c^2
+temperature_K        = 1.226901e23    # T_H = hbar c^3 / (8 pi G m kB)
+energy_J             = 8.987551787368177e16
+ops_per_s_ceiling    = 5.425570e50
+bekenstein_bits      = 3.827307e16
+landauer_J_per_bit   = 1.174135e0
+light_crossing_s     = 4.954201e-36
+per_bit_flip_s       = 7.054202e-35
+
+# ---------------------------------------------------------------------------
+# Structural identity (informational, not a constraint).
+# t_flip / t_cross  =  pi^2 / ln 2  for any envelope.
+# ---------------------------------------------------------------------------
+[invariants]
+flip_over_cross_ratio = 14.238829382869938
