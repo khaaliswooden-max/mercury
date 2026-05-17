@@ -1,0 +1,2 @@
+# mercury
+a serial computer 
