@@ -1,0 +1,65 @@
+name: conformance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same PR.
+concurrency:
+  group: conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-and-hdl:
+    name: rust tests + sv conformance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: install iverilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+          iverilog -V | head -1
+
+      - name: cargo test (release)
+        run: cargo test --release --workspace
+
+      - name: phase 3 conformance — zero_b
+        run: ./scripts/conformance.sh programs/zero_b.msq
+
+      - name: phase 3 conformance — countdown
+        run: ./scripts/conformance.sh programs/countdown.msq
+
+      - name: phase 3.5 cl wrapper conformance — zero_b
+        run: ./scripts/cl_conformance.sh programs/zero_b.msq
+
+      - name: phase 3.5 cl wrapper conformance — countdown
+        run: ./scripts/cl_conformance.sh programs/countdown.msq
+
+      - name: upload build artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ github.run_id }}
+          path: |
+            build/
+          retention-days: 7

@@ -1,0 +1,69 @@
+name: synth
+
+# Manual-only trigger: synthesis runs are expensive (~3-6 hours) and we
+# don't want them firing on every PR. Run via the Actions tab → "Run
+# workflow" button after the conformance gate has passed on the PR.
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref to build (branch, tag, or full SHA). Default: current branch."
+        required: false
+        default: ""
+      wait_for_completion:
+        description: "Block the Actions job until CodeBuild finishes (logs stream live)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write     # for OIDC token exchange
+  contents: read
+
+jobs:
+  trigger-codebuild:
+    name: kick off codebuild synthesis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 480     # CodeBuild itself has its own 480-min timeout
+
+    steps:
+      - name: assume aws role via oidc
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gha-mercury-synth-${{ github.run_id }}
+
+      - name: start codebuild
+        id: start
+        run: |
+          set -euo pipefail
+          REF_ARG=""
+          if [ -n "${{ github.event.inputs.git_ref }}" ]; then
+            REF_ARG="--source-version ${{ github.event.inputs.git_ref }}"
+          fi
+          BUILD_ID=$(aws codebuild start-build \
+            --project-name "${{ vars.CODEBUILD_PROJECT_NAME }}" \
+            ${REF_ARG} \
+            --query 'build.id' --output text)
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "Started CodeBuild: $BUILD_ID"
+
+      - name: wait for codebuild
+        if: ${{ github.event.inputs.wait_for_completion == 'true' }}
+        env:
+          BUILD_ID: ${{ steps.start.outputs.build_id }}
+        run: |
+          set -euo pipefail
+          while true; do
+            STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" \
+              --query 'builds[0].buildStatus' --output text)
+            echo "$(date -u +%H:%M:%S)  status=$STATUS"
+            case "$STATUS" in
+              SUCCEEDED) echo "build succeeded"; exit 0 ;;
+              FAILED|FAULT|TIMED_OUT|STOPPED) echo "build $STATUS"; exit 1 ;;
+              IN_PROGRESS) sleep 60 ;;
+              *) echo "unknown status: $STATUS"; sleep 60 ;;
+            esac
+          done
