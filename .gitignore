@@ -6,3 +6,6 @@ Cargo.lock
 *.vvp
 *.jsonl
 .DS_Store
+
+# bundled phase archives
+mercury-phase-*.tar.gz
