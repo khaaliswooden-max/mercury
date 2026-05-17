@@ -1,0 +1,11 @@
+/target
+/build
+Cargo.lock
+*.mem
+*.hex
+*.vvp
+*.jsonl
+.DS_Store
+
+# bundled phase archives
+mercury-phase-*.tar.gz

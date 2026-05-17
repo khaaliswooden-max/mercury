@@ -1,0 +1,78 @@
+# infra/buildspec/synth.yml — CodeBuild synthesis pipeline.
+#
+# This buildspec is invoked by the `mercury-{env}-synth` CodeBuild project.
+# It runs the full DCP build via the AWS HDK and uploads the resulting
+# tarball to S3 for `aws ec2 create-fpga-image`.
+#
+# IMPORTANT — Vivado is NOT available in the default CodeBuild image. Until
+# you provide a custom image containing Vivado (see infra/README.md
+# §"Vivado licensing"), the "verify Vivado present" step below will fail
+# and the build will exit early. That failure is intentional: it makes the
+# missing dependency explicit instead of producing silent garbage.
+
+version: 0.2
+
+env:
+  variables:
+    # Required by aws-fpga/hdk_setup.sh.
+    AWS_FPGA_REPO_DIR: /tmp/aws-fpga
+  exported-variables:
+    - DCP_S3_KEY
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "=== install ==="
+      - yum install -y git curl tar gcc make || apt-get install -y git curl tar gcc make
+      - git clone --depth 1 https://github.com/aws/aws-fpga.git "$AWS_FPGA_REPO_DIR"
+
+  pre_build:
+    commands:
+      - echo "=== pre_build ==="
+
+      # Hard gate: Vivado must be on PATH and licensed. The custom CodeBuild
+      # image (built from the FPGA Developer AMI per infra/README.md) is the
+      # only supported way to satisfy this.
+      - |
+        if ! command -v vivado >/dev/null 2>&1; then
+          echo "FATAL: Vivado not found on PATH."
+          echo "Provide a CodeBuild image derived from the FPGA Developer AMI."
+          echo "See infra/README.md → 'Vivado licensing' for the supported paths."
+          exit 1
+        fi
+      - vivado -version | head -1
+
+      - source "$AWS_FPGA_REPO_DIR/hdk_setup.sh"
+      - echo "HDK_COMMON_DIR=$HDK_COMMON_DIR"
+      - echo "CL_DIR will be set per-build"
+
+  build:
+    commands:
+      - echo "=== build ==="
+      - export DCP_S3_KEY="dcp/mercury-$(date +%Y%m%d-%H%M%S)-${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}.tar"
+      - export S3_DCP_KEY="$DCP_S3_KEY"
+      - bash hw/aws_f1/build/scripts/build_afi.sh
+
+  post_build:
+    commands:
+      - echo "=== post_build ==="
+      - |
+        if [ "$CODEBUILD_BUILD_SUCCEEDING" = "1" ]; then
+          echo "Build succeeded. DCP at s3://$S3_BUCKET/$DCP_S3_KEY"
+        else
+          echo "Build failed. Logs at s3://$S3_LOGS_BUCKET/codebuild/"
+        fi
+
+artifacts:
+  files:
+    - build/**/*.tar
+    - build/**/*.log
+  discard-paths: no
+  name: mercury-synth-$(date +%Y%m%d-%H%M%S)
+
+cache:
+  paths:
+    - /tmp/aws-fpga/**/*
+    - /root/.cargo/**/*

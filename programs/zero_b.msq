@@ -1,0 +1,9 @@
+; zero_b.msq — Mercury canonical smoke test (ARCH.md §10.2)
+;
+; Subtracts B from itself once, yielding 0; branches to halt sentinel.
+; After execution: mem[B] = 0, PC = HALT_ADDR, HALTED = true.
+
+.org 0
+start: B B done       ; mem[B] -= mem[B] = 0  →  branch to done
+done:  0 0 0xFFFF     ; branch to halt sentinel
+B:     .word 42
